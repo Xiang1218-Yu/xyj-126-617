@@ -82,7 +82,6 @@ export default function DriftBottleArea({
   /** AI寄语生成器 */
   const {
     isGenerating,
-    currentMessage,
     generateMessage,
     generateRandomMessage,
   } = useAIMessageGenerator();

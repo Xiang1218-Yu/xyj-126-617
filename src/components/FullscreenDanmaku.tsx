@@ -52,14 +52,14 @@ function DanmakuElement({
   item,
   top,
   duration,
-  delay,
   theme,
+  onAnimationEnd,
 }: {
   item: DanmakuItem;
   top: number;
   duration: number;
-  delay: number;
   theme: string;
+  onAnimationEnd?: (id: string) => void;
 }) {
   /** 根据弹幕类型获取样式 */
   const getTypeStyle = () => {
@@ -81,6 +81,12 @@ function DanmakuElement({
     }
   };
 
+  const handleAnimationEnd = () => {
+    if (onAnimationEnd) {
+      onAnimationEnd(item.id);
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -90,7 +96,7 @@ function DanmakuElement({
       style={{
         top: `${top}%`,
         right: 0,
-        animation: `danmakuScrollFull ${duration}s linear ${delay}s forwards`,
+        animation: `danmakuScrollFull ${duration}s linear forwards`,
         opacity: 0,
         maxWidth: "60%",
         overflow: "hidden",
@@ -98,6 +104,7 @@ function DanmakuElement({
         backdropFilter: "blur-sm",
         boxShadow: "0 2px 12px rgba(0, 0, 0, 0.1)",
       }}
+      onAnimationEnd={handleAnimationEnd}
     >
       {item.emoji && <span className="mr-2">{item.emoji}</span>}
       <span className="font-medium">{item.content}</span>
@@ -284,7 +291,7 @@ export default function FullscreenDanmaku({
   const [speed, setSpeed] = useState<DanmakuSpeed>(defaultSpeed);
   const [isPaused, setIsPaused] = useState(false);
   const [visibleItems, setVisibleItems] = useState<
-    { item: DanmakuItem; top: number; duration: number; delay: number }[]
+    { item: DanmakuItem; top: number; duration: number }[]
   >([]);
 
   /**
@@ -296,7 +303,7 @@ export default function FullscreenDanmaku({
 
     /** 转换鲜花数据 */
     if (danmakuType === "flower" || danmakuType === "mixed") {
-      flowers.forEach((flower, index) => {
+      flowers.forEach((flower) => {
         if (flower.message && flower.message.trim()) {
           items.push({
             id: `flower-${flower.id}`,
@@ -355,62 +362,108 @@ export default function FullscreenDanmaku({
   }, []);
 
   /**
-   * 生成一批弹幕项
-   * 职责：随机选择弹幕并分配位置和动画参数
+   * 获取弹幕生成间隔
+   * @param speedType 速度类型
+   * @returns 生成间隔（毫秒）
    */
-  const generateDanmakuBatch = useCallback(() => {
-    if (allDanmakuItems.length === 0) {
-      setVisibleItems([]);
-      return;
+  const getSpawnInterval = useCallback((speedType: DanmakuSpeed): number => {
+    switch (speedType) {
+      case "fast":
+        return 800;
+      case "normal":
+        return 1500;
+      case "slow":
+      default:
+        return 2500;
     }
+  }, []);
 
-    const maxItems = 8;
-    const count = Math.min(maxItems, allDanmakuItems.length);
-    const selected: typeof visibleItems = [];
-    const usedIndices = new Set<number>();
+  /**
+   * 生成单个弹幕项
+   * 职责：随机选择一条弹幕并分配位置和动画参数
+   * @returns 单个弹幕数据
+   */
+  const createSingleDanmaku = useCallback((): {
+    item: DanmakuItem;
+    top: number;
+    duration: number;
+  } | null => {
+    if (allDanmakuItems.length === 0) return null;
+
+    const randomIndex = Math.floor(Math.random() * allDanmakuItems.length);
+    const item = allDanmakuItems[randomIndex];
+    const top = 8 + Math.random() * 80;
     const [minDuration, maxDuration] = getDurationRange(speed);
+    const duration = minDuration + Math.random() * (maxDuration - minDuration);
 
-    for (let i = 0; i < count; i++) {
-      let idx: number;
-      do {
-        idx = Math.floor(Math.random() * allDanmakuItems.length);
-      } while (
-        usedIndices.has(idx) && usedIndices.size < allDanmakuItems.length
-      );
-      usedIndices.add(idx);
-
-      const item = allDanmakuItems[idx];
-      const top = 10 + Math.random() * 75;
-      const duration = minDuration + Math.random() * (maxDuration - minDuration);
-      const delay = Math.random() * 5;
-
-      selected.push({
-        item: { ...item, id: `${item.id}-${Date.now()}-${i}` },
-        top,
-        duration,
-        delay,
-      });
-    }
-
-    setVisibleItems(selected);
+    return {
+      item: { ...item, id: `${item.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}` },
+      top,
+      duration,
+    };
   }, [allDanmakuItems, speed, getDurationRange]);
 
   /**
-   * 弹幕循环生成
-   * 暂停时停止生成
+   * 添加一个弹幕
+   * 职责：向可见列表中添加新弹幕
+   */
+  const addDanmaku = useCallback(() => {
+    const newDanmaku = createSingleDanmaku();
+    if (!newDanmaku) return;
+
+    setVisibleItems((prev) => {
+      const maxVisible = 12;
+      if (prev.length >= maxVisible) {
+        return [...prev.slice(1), newDanmaku];
+      }
+      return [...prev, newDanmaku];
+    });
+  }, [createSingleDanmaku]);
+
+  /**
+   * 移除指定弹幕
+   * 职责：动画结束后从可见列表移除弹幕
+   * @param id 弹幕ID
+   */
+  const removeDanmaku = useCallback((id: string) => {
+    setVisibleItems((prev) => prev.filter((d) => d.item.id !== id));
+  }, []);
+
+  /**
+   * 弹幕持续生成
+   * 职责：按间隔持续生成弹幕，暂停时停止生成
    */
   useEffect(() => {
     if (!isOpen || isPaused) return;
 
-    generateDanmakuBatch();
-
     const [minDuration] = getDurationRange(speed);
-    const intervalTime = minDuration * 1000 * 0.6;
 
-    const interval = setInterval(generateDanmakuBatch, intervalTime);
+    const initialCount = 6;
+    for (let i = 0; i < initialCount; i++) {
+      const newDanmaku = createSingleDanmaku();
+      if (newDanmaku) {
+        const delay = i * (minDuration * 1000 / initialCount);
+        setTimeout(() => {
+          setVisibleItems((prev) => [...prev, newDanmaku]);
+        }, delay);
+      }
+    }
+
+    const spawnInterval = getSpawnInterval(speed);
+    const interval = setInterval(addDanmaku, spawnInterval);
 
     return () => clearInterval(interval);
-  }, [isOpen, isPaused, generateDanmakuBatch, speed, getDurationRange]);
+  }, [isOpen, isPaused, speed, createSingleDanmaku, addDanmaku, getDurationRange, getSpawnInterval]);
+
+  /**
+   * 暂停时清空所有弹幕
+   * 重新开启时重新生成
+   */
+  useEffect(() => {
+    if (!isOpen) {
+      setVisibleItems([]);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -443,14 +496,14 @@ export default function FullscreenDanmaku({
           isPaused && "danmaku-paused"
         )}
       >
-        {visibleItems.map(({ item, top, duration, delay }) => (
+        {visibleItems.map(({ item, top, duration }) => (
           <DanmakuElement
             key={item.id}
             item={item}
             top={top}
             duration={duration}
-            delay={delay}
             theme={theme}
+            onAnimationEnd={removeDanmaku}
           />
         ))}
       </div>
