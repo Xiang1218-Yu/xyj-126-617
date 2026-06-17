@@ -11,10 +11,12 @@ import {
   Sparkles,
   UserPlus,
   Pencil,
+  Maximize2,
 } from "lucide-react";
 import CollaboratePanel from "@/components/CollaboratePanel";
 import MemorialRitual from "@/components/MemorialRitual";
 import DriftBottleArea from "@/components/DriftBottleArea";
+import FullscreenDanmaku from "@/components/FullscreenDanmaku";
 import { useMemorialStore } from "@/store/memorialStore";
 import {
   formatDate,
@@ -48,6 +50,7 @@ export default function MemorialDetail() {
   const [passwordAction, setPasswordAction] = useState<"edit" | "delete">("edit");
   const [showRitual, setShowRitual] = useState(false);
   const [showCollaboratePanel, setShowCollaboratePanel] = useState(false);
+  const [showFullscreenDanmaku, setShowFullscreenDanmaku] = useState(false);
 
   useEffect(() => {
     loadMemorials();
@@ -373,6 +376,35 @@ export default function MemorialDetail() {
                     )}
                   >
                     8 个环节
+                  </span>
+                </button>
+
+                {/* 全屏弹幕开关按钮 */}
+                <button
+                  onClick={() => setShowFullscreenDanmaku(true)}
+                  className={cn(
+                    "group inline-flex items-center gap-2.5 px-6 py-3 rounded-xl font-medium text-sm md:text-base transition-all duration-300",
+                    theme === "starry"
+                      ? "bg-gradient-to-r from-cyan-500/30 to-blue-500/30 text-cyan-200 border border-cyan-400/30 hover:from-cyan-500/40 hover:to-blue-500/40 hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-500/20"
+                      : "bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 border border-blue-200 hover:from-blue-100 hover:to-cyan-100 hover:border-blue-300 hover:shadow-md hover:shadow-blue-200/30"
+                  )}
+                >
+                  <Maximize2
+                    className={cn(
+                      "w-4 h-4 md:w-5 md:h-5 transition-transform duration-300 group-hover:scale-110",
+                      theme === "starry" ? "text-cyan-300" : "text-blue-500"
+                    )}
+                  />
+                  <span className="tracking-wide">全屏弹幕</span>
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-0.5 rounded-full",
+                      theme === "starry"
+                        ? "bg-cyan-400/20 text-cyan-200"
+                        : "bg-blue-100 text-blue-600"
+                    )}
+                  >
+                    开启
                   </span>
                 </button>
               </div>
@@ -812,6 +844,18 @@ export default function MemorialDetail() {
           theme={theme}
           isAdmin={true}
           onClose={() => setShowCollaboratePanel(false)}
+        />
+      )}
+
+      {/* 全屏弹幕组件 */}
+      {memorial && id && (
+        <FullscreenDanmaku
+          flowers={memorial.flowers}
+          candles={memorial.candles}
+          bottles={getDriftBottlesForMemorial(id)}
+          isOpen={showFullscreenDanmaku}
+          onClose={() => setShowFullscreenDanmaku(false)}
+          theme={theme}
         />
       )}
       </div>
