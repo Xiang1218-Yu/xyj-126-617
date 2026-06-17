@@ -1,33 +1,66 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Waves, Send, X, Eye } from "lucide-react";
+import { Waves, Send, X, Eye, Sparkles, RefreshCw } from "lucide-react";
 import type { DriftBottle } from "@/types";
+import { AIMessageGenerator, type MessageStyle } from "@/utils/aiMessageGenerator";
 import { cn } from "@/lib/utils";
 
+/**
+ * 漂流瓶区域组件属性接口
+ */
 interface DriftBottleAreaProps {
+  /** 纪念页ID */
   memorialId: string;
+  /** 漂流瓶列表 */
   driftBottles: DriftBottle[];
+  /** 发送漂流瓶回调 */
   onSendBottle: (content: string) => DriftBottle | null;
+  /** 标记已读回调 */
   onMarkRead: (bottleId: string) => void;
+  /** 主题 */
   theme?: string;
 }
 
+/**
+ * 漂流瓶区域组件
+ *
+ * 功能职责：
+ * 1. 展示收到的漂流瓶列表
+ * 2. 提供发送漂流瓶的表单
+ * 3. 支持AI生成寄语功能
+ * 4. 支持查看漂流瓶详情弹窗
+ *
+ * 设计原则：单一职责 - 只负责漂流瓶相关UI和交互，数据管理由父组件/store负责
+ */
 export default function DriftBottleArea({
   driftBottles,
   onSendBottle,
   onMarkRead,
   theme = "default",
 }: DriftBottleAreaProps) {
+  /** 是否显示发送表单 */
   const [showSendForm, setShowSendForm] = useState(false);
+  /** 输入内容 */
   const [content, setContent] = useState("");
+  /** 是否正在发送 */
   const [isSending, setIsSending] = useState(false);
+  /** 是否正在AI生成 */
+  const [isGenerating, setIsGenerating] = useState(false);
+  /** 发送成功动画 */
   const [sentAnimation, setSentAnimation] = useState(false);
+  /** 发送目标纪念页ID */
   const [sentTarget, setSentTarget] = useState<string>("");
+  /** 当前展开的漂流瓶ID */
   const [expandedBottle, setExpandedBottle] = useState<string | null>(null);
 
+  /** 未读漂流瓶 */
   const unreadBottles = driftBottles.filter((b) => !b.isRead);
+  /** 已读漂流瓶 */
   const readBottles = driftBottles.filter((b) => b.isRead);
 
+  /**
+   * 处理发送漂流瓶
+   */
   const handleSend = () => {
     if (!content.trim()) return;
     setIsSending(true);
@@ -46,6 +79,28 @@ export default function DriftBottleArea({
     setIsSending(false);
   };
 
+  /**
+   * 处理AI生成寄语
+   *
+   * 调用AI寄语生成器生成一条漂流瓶寄语
+   */
+  const handleGenerateAIMessage = async () => {
+    if (isGenerating) return;
+
+    setIsGenerating(true);
+    try {
+      const message = await AIMessageGenerator.generate("driftBottle");
+      setContent(message);
+    } catch (error) {
+      console.error("AI生成寄语失败:", error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  /**
+   * 处理打开漂流瓶
+   */
   const handleOpenBottle = (bottle: DriftBottle) => {
     setExpandedBottle(bottle.id);
     if (!bottle.isRead) {
@@ -53,11 +108,15 @@ export default function DriftBottleArea({
     }
   };
 
+  /**
+   * 格式化日期
+   */
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
   };
 
+  /** 浅色主题瓶子颜色 */
   const bottleColors = [
     "bg-blue-50 border-blue-200",
     "bg-cyan-50 border-cyan-200",
@@ -66,6 +125,7 @@ export default function DriftBottleArea({
     "bg-sky-50 border-sky-200",
   ];
 
+  /** 深色主题瓶子颜色 */
   const darkBottleColors = [
     "bg-blue-900/20 border-blue-700/40 text-gray-200",
     "bg-cyan-900/20 border-cyan-700/40 text-gray-200",
@@ -76,6 +136,7 @@ export default function DriftBottleArea({
 
   return (
     <div className="theme-card rounded-2xl p-6 shadow-sm">
+      {/* 标题栏 */}
       <div className="flex items-center justify-between mb-6">
         <h3
           className={cn(
@@ -105,6 +166,7 @@ export default function DriftBottleArea({
         )}
       </div>
 
+      {/* 发送成功动画提示 */}
       {sentAnimation && (
         <div
           className={cn(
@@ -137,8 +199,10 @@ export default function DriftBottleArea({
         </div>
       )}
 
+      {/* 漂流瓶列表 */}
       {driftBottles.length > 0 && (
         <div className="mb-6 space-y-3 max-h-72 overflow-y-auto">
+          {/* 未读漂流瓶 */}
           {unreadBottles.map((bottle, index) => (
             <div key={bottle.id}>
               <button
@@ -186,10 +250,12 @@ export default function DriftBottleArea({
                     theme === "starry" ? "text-gray-500" : "text-memorial-400"
                   )}
                 >
-                  来自「{bottle.fromMemorialName}」的纪念页 · {formatDate(bottle.createdAt)}
+                  来自「{bottle.fromMemorialName}」的纪念页 ·{" "}
+                  {formatDate(bottle.createdAt)}
                 </div>
               </button>
 
+              {/* 漂流瓶详情弹窗 */}
               {expandedBottle === bottle.id && (
                 <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-fade-in">
                   <div
@@ -236,9 +302,7 @@ export default function DriftBottleArea({
                           : "text-memorial-400 border-memorial-100"
                       )}
                     >
-                      <span>
-                        来自「{bottle.fromMemorialName}」的纪念页
-                      </span>
+                      <span>来自「{bottle.fromMemorialName}」的纪念页</span>
                       <span>{formatDate(bottle.createdAt)}</span>
                     </div>
                     <div className="flex gap-3 mt-4">
@@ -273,6 +337,7 @@ export default function DriftBottleArea({
             </div>
           ))}
 
+          {/* 已读漂流瓶 */}
           {readBottles.map((bottle, index) => (
             <div
               key={bottle.id}
@@ -319,6 +384,7 @@ export default function DriftBottleArea({
         </div>
       )}
 
+      {/* 空状态 */}
       {driftBottles.length === 0 && !sentAnimation && (
         <div
           className={cn(
@@ -348,21 +414,53 @@ export default function DriftBottleArea({
         </div>
       )}
 
+      {/* 发送表单 */}
       {showSendForm ? (
         <div className="space-y-3">
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="写下你想寄托的匿名寄语，它会随波漂到另一个纪念页..."
-            rows={3}
-            maxLength={200}
+          {/* 文本输入区 */}
+          <div className="relative">
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="写下你想寄托的匿名寄语，它会随波漂到另一个纪念页..."
+              rows={4}
+              maxLength={200}
+              className={cn(
+                "w-full px-4 py-3 border rounded-xl focus:outline-none transition-all resize-none text-sm",
+                theme === "starry"
+                  ? "bg-slate-700 text-gray-100 placeholder-gray-400 border-slate-600 focus:ring-2 focus:ring-cyan-400/30 focus:border-cyan-400"
+                  : "border-memorial-200 focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400"
+              )}
+            />
+          </div>
+
+          {/* AI生成按钮 */}
+          <button
+            onClick={handleGenerateAIMessage}
+            disabled={isGenerating}
             className={cn(
-              "w-full px-4 py-3 border rounded-xl focus:outline-none transition-all resize-none text-sm",
-              theme === "starry"
-                ? "bg-slate-700 text-gray-100 placeholder-gray-400 border-slate-600 focus:ring-2 focus:ring-cyan-400/30 focus:border-cyan-400"
-                : "border-memorial-200 focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400"
+              "w-full flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-sm font-medium border",
+              isGenerating
+                ? "opacity-70 cursor-not-allowed"
+                : theme === "starry"
+                ? "bg-purple-500/20 border-purple-500/30 text-purple-200 hover:bg-purple-500/30"
+                : "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
             )}
-          />
+          >
+            {isGenerating ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>AI正在生成寄语...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                <span>AI 帮我写寄语</span>
+              </>
+            )}
+          </button>
+
+          {/* 底部操作栏 */}
           <div className="flex items-center justify-between">
             <span
               className={cn(
@@ -418,6 +516,7 @@ export default function DriftBottleArea({
         </button>
       )}
 
+      {/* 漂流瓶浮动动画 */}
       <style>{`
         @keyframes driftFloat {
           0%, 100% { transform: translateY(0) rotate(0deg); }
