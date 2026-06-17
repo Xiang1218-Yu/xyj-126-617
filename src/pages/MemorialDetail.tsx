@@ -15,6 +15,8 @@ import {
 import CollaboratePanel from "@/components/CollaboratePanel";
 import MemorialRitual from "@/components/MemorialRitual";
 import DriftBottleArea from "@/components/DriftBottleArea";
+import FullscreenDanmaku from "@/components/FullscreenDanmaku";
+import type { DanmakuScreenItem } from "@/components/FullscreenDanmaku";
 import { useMemorialStore } from "@/store/memorialStore";
 import {
   formatDate,
@@ -48,6 +50,7 @@ export default function MemorialDetail() {
   const [passwordAction, setPasswordAction] = useState<"edit" | "delete">("edit");
   const [showRitual, setShowRitual] = useState(false);
   const [showCollaboratePanel, setShowCollaboratePanel] = useState(false);
+  const [isDanmakuOpen, setIsDanmakuOpen] = useState(false);
 
   useEffect(() => {
     loadMemorials();
@@ -56,6 +59,30 @@ export default function MemorialDetail() {
   }, [loadMemorials, loadFamilyRelations, loadDriftBottles]);
 
   const memorial = id ? getMemorial(id) : undefined;
+
+  /** 构建全屏弹幕数据：合并鲜花、蜡烛、漂流瓶寄语 */
+  const danmakuItems = useMemo<DanmakuScreenItem[]>(() => {
+    if (!memorial || !id) return [];
+    const items: DanmakuScreenItem[] = [];
+
+    memorial.flowers.forEach((f) => {
+      if (f.message) {
+        items.push({ id: f.id, message: f.message, type: "flower" });
+      }
+    });
+
+    memorial.candles.forEach((c) => {
+      if (c.message) {
+        items.push({ id: c.id, message: c.message, type: "candle" });
+      }
+    });
+
+    getDriftBottlesForMemorial(id).forEach((b) => {
+      items.push({ id: b.id, message: b.content, type: "bottle" });
+    });
+
+    return items;
+  }, [memorial, id, getDriftBottlesForMemorial]);
 
   const timelineNodes = useMemo(() => {
     if (!memorial) return [];
@@ -453,6 +480,8 @@ export default function MemorialDetail() {
                     onSendBottle={(content) => sendDriftBottle(id, content)}
                     onMarkRead={markDriftBottleRead}
                     theme={theme}
+                    onToggleDanmaku={() => setIsDanmakuOpen((prev) => !prev)}
+                    isDanmakuOpen={isDanmakuOpen}
                   />
                 )}
 
@@ -814,6 +843,14 @@ export default function MemorialDetail() {
           onClose={() => setShowCollaboratePanel(false)}
         />
       )}
+
+      {/* 全屏弹幕层 */}
+      <FullscreenDanmaku
+        items={danmakuItems}
+        isOpen={isDanmakuOpen}
+        onClose={() => setIsDanmakuOpen(false)}
+        theme={theme}
+      />
       </div>
     </div>
   );
