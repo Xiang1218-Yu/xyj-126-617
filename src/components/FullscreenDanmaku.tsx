@@ -1,8 +1,9 @@
-import { X, Minus, Plus, Settings, Flower2, Flame, Waves } from "lucide-react";
+import { X, Settings, Flower2, Flame, Waves } from "lucide-react";
 import Danmaku from "./Danmaku";
 import type { DanmakuVariant, DanmakuSpeed } from "./Danmaku";
 import type { UnifiedDanmakuItem, DanmakuTypeConfig } from "@/hooks/useFullscreenDanmaku";
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 
 /**
  * 全屏弹幕组件属性接口
@@ -44,7 +45,7 @@ const SPEED_OPTIONS: { value: DanmakuSpeed; label: string }[] = [
  * 1. 全屏展示滚动弹幕效果
  * 2. 提供控制面板（类型切换、速度调节）
  * 3. 展示纪念页主题信息
- * 4. 支持多种类型弹幕混合显示
+ * 4. 支持多种类型弹幕混合显示（共用同一轨道系统）
  *
  * 设计原则：单一职责 - 只负责全屏弹幕的UI渲染和交互，状态管理由hook负责
  */
@@ -59,27 +60,30 @@ export default function FullscreenDanmaku({
   memorialName,
   theme = "default",
 }: FullscreenDanmakuProps) {
+  /**
+   * 合并所有已启用类型的弹幕数据
+   *
+   * 使用useMemo缓存，避免不必要的合并计算
+   * 合并后传入单个Danmaku组件，确保所有弹幕共享同一轨道系统，避免重叠
+   */
+  const mergedDanmakuItems = useMemo(() => {
+    const items: UnifiedDanmakuItem[] = [];
+
+    if (typeConfig.flower && danmakuByType.flower.length > 0) {
+      items.push(...danmakuByType.flower);
+    }
+    if (typeConfig.candle && danmakuByType.candle.length > 0) {
+      items.push(...danmakuByType.candle);
+    }
+    if (typeConfig.bottle && danmakuByType.bottle.length > 0) {
+      items.push(...danmakuByType.bottle);
+    }
+
+    return items;
+  }, [danmakuByType, typeConfig]);
+
   // 不可见时不渲染
   if (!visible) return null;
-
-  /**
-   * 渲染某类型的弹幕
-   */
-  const renderDanmakuType = (variant: DanmakuVariant) => {
-    const items = danmakuByType[variant];
-    if (items.length === 0) return null;
-
-    return (
-      <Danmaku
-        key={variant}
-        items={items}
-        variant={variant}
-        speed={speed}
-        maxItems={8}
-        className="z-10"
-      />
-    );
-  };
 
   /**
    * 切换到下一个速度档位
@@ -104,10 +108,13 @@ export default function FullscreenDanmaku({
     danmakuByType.candle.length +
     danmakuByType.bottle.length;
 
+  // 计算已启用类型的弹幕数
+  const enabledCount = mergedDanmakuItems.length;
+
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[100] animate-fade-in",
+        "fixed inset-0 z-[100] animate-fade-in overflow-hidden",
         theme === "starry"
           ? "bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900"
           : "bg-gradient-to-b from-memorial-900 via-memorial-800 to-memorial-900"
@@ -115,7 +122,7 @@ export default function FullscreenDanmaku({
     >
       {/* 背景装饰 - 星星/光点 */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {Array.from({ length: 50 }).map((_, i) => (
+        {Array.from({ length: 60 }).map((_, i) => (
           <div
             key={i}
             className="absolute rounded-full animate-pulse"
@@ -142,7 +149,7 @@ export default function FullscreenDanmaku({
               {memorialName || "追思寄语"}
             </h2>
             <p className="text-white/50 text-xs">
-              共 {totalCount} 条寄语 · 思念如潮
+              共 {totalCount} 条寄语 · 当前显示 {enabledCount} 条
             </p>
           </div>
         </div>
@@ -156,14 +163,17 @@ export default function FullscreenDanmaku({
         </button>
       </div>
 
-      {/* 弹幕区域 - 多层叠加实现混合效果 */}
-      <div className="absolute inset-0 top-16 bottom-24">
-        {renderDanmakuType("flower")}
-        {renderDanmakuType("candle")}
-        {renderDanmakuType("bottle")}
-
-        {/* 无内容提示 */}
-        {totalCount === 0 && (
+      {/* 弹幕区域 - 使用单个Danmaku组件渲染所有类型，确保轨道统一 */}
+      <div className="absolute inset-0 top-16 bottom-28">
+        {mergedDanmakuItems.length > 0 ? (
+          <Danmaku
+            items={mergedDanmakuItems}
+            speed={speed}
+            maxItems={15}
+            className="z-10"
+          />
+        ) : (
+          // 无内容提示
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
               <div className="text-5xl mb-4 opacity-50">🌊</div>
@@ -183,7 +193,7 @@ export default function FullscreenDanmaku({
 
         <div className="relative px-6 pb-6 pt-8">
           {/* 类型切换按钮组 */}
-          <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="flex items-center justify-center gap-3 mb-4 flex-wrap">
             {/* 鲜花弹幕开关 */}
             <button
               onClick={() => onToggleType("flower")}

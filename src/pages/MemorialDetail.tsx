@@ -56,10 +56,11 @@ export default function MemorialDetail() {
    * 全屏弹幕管理Hook
    *
    * 将鲜花、蜡烛、漂流瓶数据传入，统一管理全屏弹幕状态
+   * 注意：这里直接从store获取数据，避免使用未初始化的memorial变量
    */
   const fullscreenDanmaku = useFullscreenDanmaku(
-    memorial?.flowers || [],
-    memorial?.candles || [],
+    id ? getMemorial(id)?.flowers || [] : [],
+    id ? getMemorial(id)?.candles || [] : [],
     id ? getDriftBottlesForMemorial(id) : []
   );
 
