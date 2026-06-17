@@ -11,10 +11,13 @@ import {
   Sparkles,
   UserPlus,
   Pencil,
+  Monitor,
 } from "lucide-react";
 import CollaboratePanel from "@/components/CollaboratePanel";
 import MemorialRitual from "@/components/MemorialRitual";
 import DriftBottleArea from "@/components/DriftBottleArea";
+import FullscreenDanmaku from "@/components/FullscreenDanmaku";
+import type { DanmakuScreenItem } from "@/components/FullscreenDanmaku";
 import { useMemorialStore } from "@/store/memorialStore";
 import {
   formatDate,
@@ -48,6 +51,7 @@ export default function MemorialDetail() {
   const [passwordAction, setPasswordAction] = useState<"edit" | "delete">("edit");
   const [showRitual, setShowRitual] = useState(false);
   const [showCollaboratePanel, setShowCollaboratePanel] = useState(false);
+  const [isDanmakuOpen, setIsDanmakuOpen] = useState(false);
 
   useEffect(() => {
     loadMemorials();
@@ -56,6 +60,30 @@ export default function MemorialDetail() {
   }, [loadMemorials, loadFamilyRelations, loadDriftBottles]);
 
   const memorial = id ? getMemorial(id) : undefined;
+
+  /** 构建全屏弹幕数据：合并鲜花、蜡烛、漂流瓶寄语 */
+  const danmakuItems = useMemo<DanmakuScreenItem[]>(() => {
+    if (!memorial || !id) return [];
+    const items: DanmakuScreenItem[] = [];
+
+    memorial.flowers.forEach((f) => {
+      if (f.message) {
+        items.push({ id: f.id, message: f.message, type: "flower" });
+      }
+    });
+
+    memorial.candles.forEach((c) => {
+      if (c.message) {
+        items.push({ id: c.id, message: c.message, type: "candle" });
+      }
+    });
+
+    getDriftBottlesForMemorial(id).forEach((b) => {
+      items.push({ id: b.id, message: b.content, type: "bottle" });
+    });
+
+    return items;
+  }, [memorial, id, getDriftBottlesForMemorial]);
 
   const timelineNodes = useMemo(() => {
     if (!memorial) return [];
@@ -181,6 +209,26 @@ export default function MemorialDetail() {
             </Link>
 
             <div className="flex items-center gap-1">
+              {/* 全屏弹幕入口 */}
+              {danmakuItems.length > 0 && (
+                <button
+                  onClick={() => setIsDanmakuOpen((prev) => !prev)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    isDanmakuOpen
+                      ? theme === "starry"
+                        ? "bg-cyan-500/30 text-cyan-200 border border-cyan-400/40"
+                        : "bg-blue-100 text-blue-700 border border-blue-300"
+                      : theme === "starry"
+                        ? "bg-white/10 text-gray-300 hover:bg-white/20"
+                        : "bg-memorial-100 text-memorial-600 hover:bg-memorial-200"
+                  )}
+                  title={isDanmakuOpen ? "关闭全屏弹幕" : "开启全屏弹幕"}
+                >
+                  <Monitor className="w-4 h-4" />
+                  <span className="hidden sm:inline">{isDanmakuOpen ? "关闭弹幕" : "全屏弹幕"}</span>
+                </button>
+              )}
               {isCollaborator && (
                 <button
                   onClick={() => navigate(`/collaborate/${id}`)}
@@ -814,6 +862,14 @@ export default function MemorialDetail() {
           onClose={() => setShowCollaboratePanel(false)}
         />
       )}
+
+      {/* 全屏弹幕层 */}
+      <FullscreenDanmaku
+        items={danmakuItems}
+        isOpen={isDanmakuOpen}
+        onClose={() => setIsDanmakuOpen(false)}
+        theme={theme}
+      />
       </div>
     </div>
   );
