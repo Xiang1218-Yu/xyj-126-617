@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Waves, Monitor } from "lucide-react";
+import { Waves } from "lucide-react";
 import type { DriftBottle } from "@/types";
 import { cn } from "@/lib/utils";
 import DriftBottleSendForm from "./DriftBottleSendForm";
@@ -18,10 +18,6 @@ interface DriftBottleAreaProps {
   onMarkRead: (bottleId: string) => void;
   /** 主题 */
   theme?: string;
-  /** 全屏弹幕开关回调 */
-  onToggleDanmaku?: () => void;
-  /** 是否正在显示全屏弹幕 */
-  isDanmakuOpen?: boolean;
 }
 
 /**
@@ -36,8 +32,6 @@ export default function DriftBottleArea({
   onSendBottle,
   onMarkRead,
   theme = "default",
-  onToggleDanmaku,
-  isDanmakuOpen = false,
 }: DriftBottleAreaProps) {
   const [showSendForm, setShowSendForm] = useState(false);
   const [sentAnimation, setSentAnimation] = useState(false);
@@ -96,27 +90,6 @@ export default function DriftBottleArea({
         </h3>
 
         <div className="flex items-center gap-2">
-          {/* 全屏弹幕开关 */}
-          {onToggleDanmaku && driftBottles.length > 0 && (
-            <button
-              onClick={onToggleDanmaku}
-              className={cn(
-                "text-xs px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1",
-                isDanmakuOpen
-                  ? isDark
-                    ? "bg-cyan-500/30 text-cyan-200 border border-cyan-400/40"
-                    : "bg-blue-100 text-blue-700 border border-blue-300"
-                  : isDark
-                    ? "bg-white/5 text-gray-400 hover:text-gray-200 border border-transparent hover:border-gray-600"
-                    : "bg-memorial-50 text-memorial-500 hover:text-memorial-700 border border-transparent hover:border-memorial-200"
-              )}
-              title={isDanmakuOpen ? "关闭全屏弹幕" : "开启全屏弹幕"}
-            >
-              <Monitor className="w-3 h-3" />
-              {isDanmakuOpen ? "弹幕中" : "弹幕"}
-            </button>
-          )}
-
           {/* 未读数量 */}
           {unreadBottles.length > 0 && (
             <span
