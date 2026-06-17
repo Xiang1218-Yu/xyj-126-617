@@ -57,6 +57,7 @@ interface VisibleDanmakuItem {
   duration: number;
   delay: number;
   variant: DanmakuVariant;
+  createdAt: number;
 }
 
 /**
@@ -144,6 +145,7 @@ function getSpeedDuration(speed: DanmakuSpeed, mode: DanmakuMode): [number, numb
  * 2. 支持内嵌模式和全屏模式
  * 3. 支持多种弹幕类型（鲜花、蜡烛、漂流瓶）
  * 4. 随机生成弹幕位置和动画参数
+ * 5. 流式生成弹幕，确保从右到左完整滚动
  *
  * @template T - 弹幕数据类型，必须包含id和message字段
  */
@@ -167,12 +169,12 @@ export default function Danmaku<T extends DanmakuItemBase>({
   );
 
   /**
-   * 生成弹幕效果
+   * 流式生成弹幕
    *
    * 职责：
-   * 1. 随机选择弹幕项
-   * 2. 为每个弹幕生成随机的垂直位置、动画时长和延迟
-   * 3. 更新可见弹幕列表
+   * 1. 每隔一段时间添加一条新弹幕
+   * 2. 清理已经完成动画的弹幕
+   * 3. 保持弹幕数量在 maxItems 以内
    */
   useEffect(() => {
     if (messagesWithText.length === 0) {
@@ -180,44 +182,78 @@ export default function Danmaku<T extends DanmakuItemBase>({
       return;
     }
 
-    const generateDanmaku = () => {
-      const count = Math.min(maxItems, messagesWithText.length);
-      const selected: VisibleDanmakuItem[] = [];
-      const usedIndices = new Set<number>();
+    const [minDuration, maxDuration] = getSpeedDuration(speed, mode);
+    const spawnInterval = Math.max((minDuration * 1000) / maxItems, 2000);
 
-      const [minDuration, maxDuration] = getSpeedDuration(speed, mode);
+    /**
+     * 生成单条弹幕
+     *
+     * 职责：随机选择一条消息，生成随机的垂直位置和动画时长
+     *
+     * @returns 生成的弹幕项
+     */
+    const createDanmakuItem = (): VisibleDanmakuItem | null => {
+      if (messagesWithText.length === 0) return null;
 
-      for (let i = 0; i < count; i++) {
-        let idx: number;
-        do {
-          idx = Math.floor(Math.random() * messagesWithText.length);
-        } while (usedIndices.has(idx) && usedIndices.size < messagesWithText.length);
-        usedIndices.add(idx);
+      const randomIdx = Math.floor(Math.random() * messagesWithText.length);
+      const item = messagesWithText[randomIdx];
+      const top = mode === "fullscreen" ? 5 + Math.random() * 85 : 10 + Math.random() * 70;
+      const duration = minDuration + Math.random() * (maxDuration - minDuration);
+      const now = Date.now();
 
-        const item = messagesWithText[idx];
-        const top = mode === "fullscreen" ? 5 + Math.random() * 85 : 10 + Math.random() * 70;
-        const duration = minDuration + Math.random() * (maxDuration - minDuration);
-        const delay = Math.random() * 5;
-
-        selected.push({
-          id: `${item.id}-${Date.now()}-${i}`,
-          message: item.message,
-          top,
-          duration,
-          delay,
-          variant,
-        });
-      }
-
-      setVisibleItems(selected);
+      return {
+        id: `${item.id}-${now}-${Math.random().toString(36).substr(2, 9)}`,
+        message: item.message,
+        top,
+        duration,
+        delay: 0,
+        variant,
+        createdAt: now,
+      };
     };
 
-    generateDanmaku();
+    /**
+     * 清理过期弹幕
+     *
+     * 职责：移除动画已完成的弹幕，防止内存泄漏
+     */
+    const cleanupExpired = () => {
+      const now = Date.now();
+      setVisibleItems((prev) =>
+        prev.filter((item) => {
+          const elapsed = (now - item.createdAt) / 1000;
+          return elapsed < item.duration + 1;
+        })
+      );
+    };
 
-    const intervalTime = mode === "fullscreen" ? 8000 : 12000;
-    const interval = setInterval(generateDanmaku, intervalTime);
+    /**
+     * 添加新弹幕
+     *
+     * 职责：添加新弹幕，保持数量不超过maxItems
+     */
+    const addNewDanmaku = () => {
+      setVisibleItems((prev) => {
+        if (prev.length >= maxItems) {
+          return prev;
+        }
+        const newItem = createDanmakuItem();
+        if (!newItem) return prev;
+        return [...prev, newItem];
+      });
+    };
 
-    return () => clearInterval(interval);
+    for (let i = 0; i < Math.min(maxItems, 3); i++) {
+      setTimeout(() => addNewDanmaku(), i * (spawnInterval / 2));
+    }
+
+    const spawnTimer = setInterval(addNewDanmaku, spawnInterval);
+    const cleanupTimer = setInterval(cleanupExpired, 5000);
+
+    return () => {
+      clearInterval(spawnTimer);
+      clearInterval(cleanupTimer);
+    };
   }, [messagesWithText, speed, maxItems, mode, variant]);
 
   if (messagesWithText.length === 0) {
@@ -247,7 +283,7 @@ export default function Danmaku<T extends DanmakuItemBase>({
           )}
           style={{
             top: `${item.top}%`,
-            right: 0,
+            left: "100%",
             animation: `danmakuScroll ${item.duration}s linear ${item.delay}s forwards`,
             opacity: 0,
             maxWidth: mode === "fullscreen" ? "60%" : "70%",
@@ -263,19 +299,22 @@ export default function Danmaku<T extends DanmakuItemBase>({
       <style>{`
         @keyframes danmakuScroll {
           0% {
-            transform: translateX(100%);
+            transform: translate3d(0, 0, 0);
             opacity: 0;
           }
-          5% {
+          2% {
             opacity: 0.9;
           }
-          90% {
+          98% {
             opacity: 0.9;
           }
           100% {
-            transform: translateX(calc(-100vw - 100%));
+            transform: translate3d(calc(-150vw - 100%), 0, 0);
             opacity: 0;
           }
+        }
+        .danmaku-item {
+          will-change: transform, opacity;
         }
       `}</style>
     </div>

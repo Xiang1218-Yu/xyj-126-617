@@ -289,14 +289,30 @@ export default function FullscreenDanmaku({
         <button
           onClick={onClose}
           className={cn(
-            "p-2.5 rounded-full transition-colors",
+            "p-2.5 rounded-full transition-all hover:scale-110",
             theme === "starry"
-              ? "bg-slate-800/80 text-gray-300 hover:bg-red-500/80 hover:text-white backdrop-blur-md"
-              : "bg-white/80 text-memorial-600 hover:bg-red-500 hover:text-white backdrop-blur-md shadow-md"
+              ? "bg-red-500/90 text-white hover:bg-red-500 backdrop-blur-md shadow-lg shadow-red-500/30"
+              : "bg-red-500 text-white hover:bg-red-600 backdrop-blur-md shadow-lg shadow-red-500/30"
           )}
           title="关闭全屏弹幕"
         >
           <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* 底部关闭按钮 - 更醒目 */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-auto">
+        <button
+          onClick={onClose}
+          className={cn(
+            "inline-flex items-center gap-2 px-8 py-3 rounded-full font-medium text-sm transition-all hover:scale-105",
+            theme === "starry"
+              ? "bg-slate-800/80 text-gray-300 hover:bg-slate-700/90 backdrop-blur-md border border-slate-600"
+              : "bg-white/90 text-memorial-600 hover:bg-white backdrop-blur-md border border-memorial-200 shadow-lg"
+          )}
+        >
+          <X className="w-4 h-4" />
+          关闭弹幕
         </button>
       </div>
 
