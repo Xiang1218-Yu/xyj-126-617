@@ -11,6 +11,7 @@ import {
   Sparkles,
   UserPlus,
   Pencil,
+  MessageCircle,
 } from "lucide-react";
 import CollaboratePanel from "@/components/CollaboratePanel";
 import MemorialRitual from "@/components/MemorialRitual";
@@ -33,6 +34,8 @@ import ThemeSelector from "@/components/ThemeSelector";
 import BiographyTimeline from "@/components/BiographyTimeline";
 import WordCloud from "@/components/WordCloud";
 import FestivalDecorations from "@/components/FestivalDecorations";
+import FullscreenDanmaku from "@/components/FullscreenDanmaku";
+import { useFullscreenDanmaku } from "@/hooks/useFullscreenDanmaku";
 import { cn } from "@/lib/utils";
 
 export default function MemorialDetail() {
@@ -48,6 +51,18 @@ export default function MemorialDetail() {
   const [passwordAction, setPasswordAction] = useState<"edit" | "delete">("edit");
   const [showRitual, setShowRitual] = useState(false);
   const [showCollaboratePanel, setShowCollaboratePanel] = useState(false);
+
+  /**
+   * 全屏弹幕管理Hook
+   *
+   * 将鲜花、蜡烛、漂流瓶数据传入，统一管理全屏弹幕状态
+   * 注意：这里直接从store获取数据，避免使用未初始化的memorial变量
+   */
+  const fullscreenDanmaku = useFullscreenDanmaku(
+    id ? getMemorial(id)?.flowers || [] : [],
+    id ? getMemorial(id)?.candles || [] : [],
+    id ? getDriftBottlesForMemorial(id) : []
+  );
 
   useEffect(() => {
     loadMemorials();
@@ -373,6 +388,35 @@ export default function MemorialDetail() {
                     )}
                   >
                     8 个环节
+                  </span>
+                </button>
+
+                {/* 全屏弹幕入口按钮 */}
+                <button
+                  onClick={fullscreenDanmaku.toggleFullscreen}
+                  className={cn(
+                    "group inline-flex items-center gap-2.5 px-6 py-3 rounded-xl font-medium text-sm md:text-base transition-all duration-300",
+                    theme === "starry"
+                      ? "bg-gradient-to-r from-blue-500/30 to-cyan-500/30 text-blue-200 border border-blue-400/30 hover:from-blue-500/40 hover:to-cyan-500/40 hover:border-blue-400/50 hover:shadow-lg hover:shadow-blue-500/20"
+                      : "bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 border border-blue-200 hover:from-blue-100 hover:to-cyan-100 hover:border-blue-300 hover:shadow-md hover:shadow-blue-200/30"
+                  )}
+                >
+                  <MessageCircle
+                    className={cn(
+                      "w-4 h-4 md:w-5 md:h-5 transition-transform duration-500 group-hover:scale-110",
+                      theme === "starry" ? "text-cyan-300" : "text-blue-500"
+                    )}
+                  />
+                  <span className="tracking-wide">全屏弹幕</span>
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-0.5 rounded-full",
+                      theme === "starry"
+                        ? "bg-cyan-400/20 text-cyan-200"
+                        : "bg-blue-100 text-blue-700"
+                    )}
+                  >
+                    {fullscreenDanmaku.danmakuItems.length} 条
                   </span>
                 </button>
               </div>
@@ -814,6 +858,19 @@ export default function MemorialDetail() {
           onClose={() => setShowCollaboratePanel(false)}
         />
       )}
+
+      {/* 全屏弹幕组件 */}
+      <FullscreenDanmaku
+        visible={fullscreenDanmaku.isFullscreen}
+        onClose={fullscreenDanmaku.closeFullscreen}
+        danmakuByType={fullscreenDanmaku.danmakuByType}
+        typeConfig={fullscreenDanmaku.typeConfig}
+        onToggleType={fullscreenDanmaku.toggleDanmakuType}
+        speed={fullscreenDanmaku.speed}
+        onSpeedChange={fullscreenDanmaku.setSpeed}
+        memorialName={memorial?.name}
+        theme={theme}
+      />
       </div>
     </div>
   );
