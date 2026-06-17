@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Waves, Send, X, Eye } from "lucide-react";
+import { Waves, Send, X, Eye, Sparkles, RefreshCw } from "lucide-react";
 import type { DriftBottle } from "@/types";
 import { cn } from "@/lib/utils";
+import { generateAIMessage, getMessageStyles, type MessageStyle } from "@/utils/aiMessageGenerator";
 
 interface DriftBottleAreaProps {
   memorialId: string;
@@ -24,9 +25,26 @@ export default function DriftBottleArea({
   const [sentAnimation, setSentAnimation] = useState(false);
   const [sentTarget, setSentTarget] = useState<string>("");
   const [expandedBottle, setExpandedBottle] = useState<string | null>(null);
+  const [selectedStyle, setSelectedStyle] = useState<MessageStyle>("warm");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showStyleSelector, setShowStyleSelector] = useState(false);
 
   const unreadBottles = driftBottles.filter((b) => !b.isRead);
   const readBottles = driftBottles.filter((b) => b.isRead);
+
+  /**
+   * 处理AI生成寄语
+   *
+   * 职责：模拟AI生成过程，生成对应风格的寄语
+   */
+  const handleGenerateAIMessage = () => {
+    setIsGenerating(true);
+    setTimeout(() => {
+      const message = generateAIMessage("driftBottle", selectedStyle);
+      setContent(message);
+      setIsGenerating(false);
+    }, 500);
+  };
 
   const handleSend = () => {
     if (!content.trim()) return;
@@ -36,6 +54,7 @@ export default function DriftBottleArea({
     if (result) {
       setContent("");
       setShowSendForm(false);
+      setShowStyleSelector(false);
       setSentTarget(result.toMemorialId);
       setSentAnimation(true);
       setTimeout(() => {
@@ -350,6 +369,97 @@ export default function DriftBottleArea({
 
       {showSendForm ? (
         <div className="space-y-3">
+          {/* AI寄语生成区域 */}
+          <div
+            className={cn(
+              "p-3 rounded-xl border",
+              theme === "starry"
+                ? "bg-cyan-900/20 border-cyan-700/40"
+                : "bg-cyan-50/50 border-cyan-200"
+            )}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <Sparkles
+                  className={cn(
+                    "w-4 h-4",
+                    theme === "starry" ? "text-cyan-400" : "text-cyan-600"
+                  )}
+                />
+                <span
+                  className={cn(
+                    "text-xs font-medium",
+                    theme === "starry" ? "text-cyan-300" : "text-cyan-700"
+                  )}
+                >
+                  AI智能寄语
+                </span>
+              </div>
+              <button
+                onClick={() => setShowStyleSelector(!showStyleSelector)}
+                className={cn(
+                  "text-xs px-2 py-0.5 rounded-full transition-colors",
+                  theme === "starry"
+                    ? "text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/20"
+                    : "text-cyan-600 hover:text-cyan-700 hover:bg-cyan-100"
+                )}
+              >
+                {getMessageStyles().find((s) => s.id === selectedStyle)?.name}风格
+              </button>
+            </div>
+
+            {/* 风格选择器 */}
+            {showStyleSelector && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {getMessageStyles().map((style) => (
+                  <button
+                    key={style.id}
+                    onClick={() => setSelectedStyle(style.id)}
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-full border transition-all",
+                      selectedStyle === style.id
+                        ? theme === "starry"
+                          ? "bg-cyan-500/30 border-cyan-400/50 text-cyan-200"
+                          : "bg-cyan-100 border-cyan-300 text-cyan-700"
+                        : theme === "starry"
+                        ? "border-slate-600 text-gray-400 hover:text-gray-200 hover:border-slate-500"
+                        : "border-memorial-200 text-memorial-500 hover:text-memorial-700 hover:border-memorial-300"
+                    )}
+                    title={style.description}
+                  >
+                    {style.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* AI生成按钮 */}
+            <button
+              onClick={handleGenerateAIMessage}
+              disabled={isGenerating}
+              className={cn(
+                "w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-colors",
+                theme === "starry"
+                  ? "bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30"
+                  : "bg-cyan-100 text-cyan-700 hover:bg-cyan-200",
+                isGenerating && "opacity-70 cursor-not-allowed"
+              )}
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  生成AI寄语
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* 寄语输入框 */}
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -377,6 +487,7 @@ export default function DriftBottleArea({
                 onClick={() => {
                   setShowSendForm(false);
                   setContent("");
+                  setShowStyleSelector(false);
                 }}
                 className={cn(
                   "px-4 py-2 text-sm transition-colors",
